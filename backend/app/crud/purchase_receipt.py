@@ -1,16 +1,21 @@
-# 采购入库单的数据库操作 + 库存更新 + 订单状态更新
+# 采购入库单的数据库操作 + 库存更新 + 序列号库存 + 订单状态更新
 # 核心流程：
 #   1. 生成入库单号
 #   2. 建入库主表 + 明细
-#   3. 按"商品+仓库+批次"逐条累加库存（不存在则新建库存记录）
-#   4. 重新计算订单已入库数量，更新订单状态（completed / partial）
+#   3. 商品启用序列号管理 -> 每个序列号写入 SerialInventory（状态 available）
+#   4. 按"商品+仓库+批次"累加 Inventory 数量
+#   5. 重新计算订单已入库数量，更新订单状态（completed / partial）
+#
+# 注意：序列号是否必填、数量是否一致、是否重复等校验放在路由层（router）
+#      这里的 db.flush() 是为了让统计查询能看到刚 add 未提交的数据
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
+from app.crud.inventory import add_serial_record, upsert_inventory
 from app.crud.numbering import generate_serial_number
 from app.models import (
-    Inventory,
+    Product,
     PurchaseOrder,
     PurchaseOrderItem,
     PurchaseReceipt,
@@ -41,50 +46,6 @@ def get_received_quantities(
         .all()
     )
     return {product_id: int(total) for product_id, total in rows}
-
-
-def _upsert_inventory(
-    db: Session,
-    *,
-    product_id: int,
-    warehouse_id: int,
-    batch_number: str | None,
-    quantity: int,
-) -> None:
-    # 按 商品+仓库+批次 找已有库存记录
-    # 注意：批次为空时不能用 = 比较（SQL 中 NULL = NULL 不成立），用 is_(None)
-    if batch_number is None:
-        inventory = (
-            db.query(Inventory)
-            .filter(
-                Inventory.product_id == product_id,
-                Inventory.warehouse_id == warehouse_id,
-                Inventory.batch_number.is_(None),
-            )
-            .first()
-        )
-    else:
-        inventory = (
-            db.query(Inventory)
-            .filter(
-                Inventory.product_id == product_id,
-                Inventory.warehouse_id == warehouse_id,
-                Inventory.batch_number == batch_number,
-            )
-            .first()
-        )
-
-    if inventory is not None:
-        inventory.quantity += quantity  # 已存在：累加数量
-    else:
-        db.add(  # 不存在：新建一条库存记录
-            Inventory(
-                product_id=product_id,
-                warehouse_id=warehouse_id,
-                batch_number=batch_number,
-                quantity=quantity,
-            )
-        )
 
 
 def _update_order_status(db: Session, order_id: int) -> None:
@@ -140,7 +101,7 @@ def create_purchase_receipt(db: Session, data: PurchaseReceiptCreate) -> Purchas
     db.add(receipt)
     db.flush()
 
-    # 3. 批量创建入库明细 + 累加库存
+    # 3. 批量创建入库明细 + 写库存/序列号库存
     for item in data.items:
         db.add(
             PurchaseReceiptItem(
@@ -153,7 +114,22 @@ def create_purchase_receipt(db: Session, data: PurchaseReceiptCreate) -> Purchas
                 expiry_date=item.expiry_date,
             )
         )
-        _upsert_inventory(
+
+        product = db.get(Product, item.product_id)
+        # 序列号管理商品：每个序列号单独写一行，状态 available
+        # 注：序列号必填 / 数量必须等于 quantity / 查重 由路由层校验
+        if product is not None and product.enable_serial_tracking:
+            for serial in item.serial_numbers or []:
+                add_serial_record(
+                    db,
+                    product_id=item.product_id,
+                    warehouse_id=data.warehouse_id,
+                    serial_number=serial,
+                    batch_number=item.batch_number,
+                )
+
+        # 无论是否序列号管理，都累加原有 Inventory 表数量
+        upsert_inventory(
             db,
             product_id=item.product_id,
             warehouse_id=data.warehouse_id,

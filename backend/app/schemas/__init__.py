@@ -2,7 +2,7 @@
 
 from app.schemas.category import Category, CategoryCreate, CategoryUpdate
 from app.schemas.customer import Customer, CustomerCreate, CustomerUpdate
-from app.schemas.inventory import Inventory
+from app.schemas.inventory import AvailableSerialsResponse, Inventory, SerialInfo
 from app.schemas.product import Product, ProductCreate, ProductUpdate
 from app.schemas.product_price import ProductPrice, ProductPriceCreate
 from app.schemas.purchase_order import (
@@ -30,6 +30,8 @@ __all__ = [
     "CustomerCreate",
     "CustomerUpdate",
     "Inventory",
+    "AvailableSerialsResponse",
+    "SerialInfo",
     "Product",
     "ProductCreate",
     "ProductUpdate",

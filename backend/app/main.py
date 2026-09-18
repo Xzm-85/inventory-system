@@ -13,6 +13,7 @@ from app.routers import (
     category,
     customer,
     health,
+    inventory,
     product,
     product_price,
     purchase_order,
@@ -71,3 +72,4 @@ app.include_router(customer.router)
 app.include_router(warehouse.router)
 app.include_router(purchase_order.router)
 app.include_router(purchase_receipt.router)
+app.include_router(inventory.router)

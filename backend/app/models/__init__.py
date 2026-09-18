@@ -9,6 +9,7 @@ from app.models.product import Product
 from app.models.product_price import ProductPrice
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
 from app.models.purchase_receipt import PurchaseReceipt, PurchaseReceiptItem
+from app.models.serial_inventory import SerialInventory
 from app.models.supplier import Supplier
 from app.models.unit import Unit
 from app.models.warehouse import Warehouse
@@ -23,6 +24,7 @@ __all__ = [
     "PurchaseOrderItem",
     "PurchaseReceipt",
     "PurchaseReceiptItem",
+    "SerialInventory",
     "Supplier",
     "Unit",
     "Warehouse",

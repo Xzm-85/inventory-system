@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.crud.inventory import get_serial_by_number
 from app.crud.product import get_product
 from app.crud.purchase_order import get_purchase_order
 from app.crud.purchase_receipt import create_purchase_receipt, get_received_quantities
@@ -13,6 +14,33 @@ from app.models import PurchaseOrderItem
 from app.schemas.purchase_receipt import PurchaseReceipt, PurchaseReceiptCreate
 
 router = APIRouter(prefix="/purchase-receipts", tags=["purchase-receipts"])
+
+
+def _validate_serials(db: Session, item, product) -> None:
+    # 序列号管理商品的入库校验：
+    #   1. serial_numbers 必填
+    #   2. 数量必须与 quantity 一致
+    #   3. 列表内不能有重复
+    #   4. 全局不能与已有序列号重复
+    if not product.enable_serial_tracking:
+        return
+
+    serials = item.serial_numbers or []
+    if not serials:
+        raise HTTPException(
+            status_code=400,
+            detail=f"商品(product_id={item.product_id})启用序列号管理，serial_numbers 必填",
+        )
+    if len(serials) != item.quantity:
+        raise HTTPException(
+            status_code=400,
+            detail=f"商品(product_id={item.product_id})序列号数量({len(serials)})与入库数量({item.quantity})不一致",
+        )
+    if len(set(serials)) != len(serials):
+        raise HTTPException(status_code=400, detail=f"序列号列表中存在重复")
+    for serial in serials:
+        if get_serial_by_number(db, serial) is not None:
+            raise HTTPException(status_code=400, detail=f"序列号 {serial} 已存在，不能重复入库")
 
 
 # POST /purchase-receipts —— 创建入库单
@@ -33,7 +61,8 @@ def create(data: PurchaseReceiptCreate, db: Session = Depends(get_db)):
     received = get_received_quantities(db, data.order_id)
 
     for item in data.items:
-        if get_product(db, item.product_id) is None:
+        product = get_product(db, item.product_id)
+        if product is None:
             raise HTTPException(
                 status_code=400, detail=f"商品不存在（product_id={item.product_id}）"
             )
@@ -43,5 +72,7 @@ def create(data: PurchaseReceiptCreate, db: Session = Depends(get_db)):
                 status_code=400,
                 detail=f"商品(product_id={item.product_id})超量入库，剩余可入库 {remaining}，本次 {item.quantity}",
             )
+        # 序列号管理商品的序列号校验（必填/数量一致/查重）
+        _validate_serials(db, item, product)
 
     return create_purchase_receipt(db, data)
