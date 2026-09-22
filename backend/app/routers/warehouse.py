@@ -6,6 +6,7 @@
 #   DELETE /warehouses/{id}   删除
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.deps import require_permission
 from sqlalchemy.orm import Session
 
 from app.crud.warehouse import (
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/warehouses", tags=["warehouses"])
 
 
 # POST /warehouses —— 新增，名称重复则 400
-@router.post("", response_model=Warehouse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Warehouse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("base_data", "create"))])
 def create(data: WarehouseCreate, db: Session = Depends(get_db)):
     if get_warehouse_by_name(db, data.name) is not None:
         raise HTTPException(status_code=400, detail="仓库名称已存在")
@@ -31,13 +32,13 @@ def create(data: WarehouseCreate, db: Session = Depends(get_db)):
 
 
 # GET /warehouses —— 列表
-@router.get("", response_model=list[Warehouse])
+@router.get("", response_model=list[Warehouse], dependencies=[Depends(require_permission("base_data", "view"))])
 def list_warehouses(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return get_warehouses(db, skip=skip, limit=limit)
 
 
 # GET /warehouses/{warehouse_id} —— 按 id 查询
-@router.get("/{warehouse_id}", response_model=Warehouse)
+@router.get("/{warehouse_id}", response_model=Warehouse, dependencies=[Depends(require_permission("base_data", "view"))])
 def read(warehouse_id: int, db: Session = Depends(get_db)):
     warehouse = get_warehouse(db, warehouse_id)
     if warehouse is None:
@@ -46,7 +47,7 @@ def read(warehouse_id: int, db: Session = Depends(get_db)):
 
 
 # PUT /warehouses/{warehouse_id} —— 更新，改名时查重
-@router.put("/{warehouse_id}", response_model=Warehouse)
+@router.put("/{warehouse_id}", response_model=Warehouse, dependencies=[Depends(require_permission("base_data", "edit"))])
 def update(warehouse_id: int, data: WarehouseUpdate, db: Session = Depends(get_db)):
     if data.name is not None:
         existing = get_warehouse_by_name(db, data.name)
@@ -59,7 +60,7 @@ def update(warehouse_id: int, data: WarehouseUpdate, db: Session = Depends(get_d
 
 
 # DELETE /warehouses/{warehouse_id} —— 删除
-@router.delete("/{warehouse_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{warehouse_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permission("base_data", "delete"))])
 def delete(warehouse_id: int, db: Session = Depends(get_db)):
     if not delete_warehouse(db, warehouse_id):
         raise HTTPException(status_code=404, detail="仓库不存在")

@@ -6,6 +6,7 @@
 #   DELETE /categories/{id}   删除
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.deps import require_permission
 from sqlalchemy.orm import Session
 
 from app.crud.category import (
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 
 
 # POST /categories —— 新增，名称重复则 400
-@router.post("", response_model=Category, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Category, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("product", "create"))])
 def create(data: CategoryCreate, db: Session = Depends(get_db)):
     if get_category_by_name(db, data.name) is not None:
         raise HTTPException(status_code=400, detail="分类名称已存在")
@@ -31,13 +32,13 @@ def create(data: CategoryCreate, db: Session = Depends(get_db)):
 
 
 # GET /categories —— 列表
-@router.get("", response_model=list[Category])
+@router.get("", response_model=list[Category], dependencies=[Depends(require_permission("product", "view"))])
 def list_categories(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return get_categories(db, skip=skip, limit=limit)
 
 
 # GET /categories/{category_id} —— 按 id 查询
-@router.get("/{category_id}", response_model=Category)
+@router.get("/{category_id}", response_model=Category, dependencies=[Depends(require_permission("product", "view"))])
 def read(category_id: int, db: Session = Depends(get_db)):
     category = get_category(db, category_id)
     if category is None:
@@ -46,7 +47,7 @@ def read(category_id: int, db: Session = Depends(get_db)):
 
 
 # PUT /categories/{category_id} —— 更新，改名时查重
-@router.put("/{category_id}", response_model=Category)
+@router.put("/{category_id}", response_model=Category, dependencies=[Depends(require_permission("product", "edit"))])
 def update(category_id: int, data: CategoryUpdate, db: Session = Depends(get_db)):
     if data.name is not None:
         existing = get_category_by_name(db, data.name)
@@ -59,7 +60,7 @@ def update(category_id: int, data: CategoryUpdate, db: Session = Depends(get_db)
 
 
 # DELETE /categories/{category_id} —— 删除
-@router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permission("product", "delete"))])
 def delete(category_id: int, db: Session = Depends(get_db)):
     if not delete_category(db, category_id):
         raise HTTPException(status_code=404, detail="分类不存在")

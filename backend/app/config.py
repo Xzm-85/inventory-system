@@ -1,4 +1,4 @@
-# 配置文件：负责读取数据库连接信息
+# 配置文件：负责读取数据库连接信息 + JWT 密钥
 # 相当于前端的"全局配置常量"，只不过值来自环境变量 / .env 文件
 
 import os
@@ -23,3 +23,8 @@ DATABASE_URL = (
     f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     "?charset=utf8mb4"
 )
+
+# JWT 配置：密钥、算法、token 有效期（分钟）
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
+ALGORITHM = "HS256"
+TOKEN_EXPIRE_MINUTES = int(os.getenv("TOKEN_EXPIRE_MINUTES", "480"))

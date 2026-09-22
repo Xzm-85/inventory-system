@@ -3,6 +3,7 @@
 #   GET  /product-prices?product_id=1 查询某个商品的所有价格
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.deps import require_permission
 from sqlalchemy.orm import Session
 
 from app.crud.product import get_product
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/product-prices", tags=["product-prices"])
 
 
 # POST /product-prices —— 新增价格，商品必须存在
-@router.post("", response_model=ProductPrice, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ProductPrice, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("product", "create"))])
 def create(data: ProductPriceCreate, db: Session = Depends(get_db)):
     if get_product(db, data.product_id) is None:
         raise HTTPException(status_code=400, detail="商品不存在")
@@ -23,7 +24,7 @@ def create(data: ProductPriceCreate, db: Session = Depends(get_db)):
 
 # GET /product-prices?product_id=... —— 按商品查询价格列表
 # product_id 是 query 参数，不传会返回 400
-@router.get("", response_model=list[ProductPrice])
+@router.get("", response_model=list[ProductPrice], dependencies=[Depends(require_permission("product", "view"))])
 def list_prices(
     product_id: int | None = None,
     skip: int = 0,

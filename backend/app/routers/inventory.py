@@ -2,6 +2,7 @@
 #   GET /inventories/serials?product_id=&warehouse_id=   查询某商品某仓库下的可用序列号
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.deps import require_permission
 from sqlalchemy.orm import Session
 
 from app.crud.inventory import get_available_serials
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/inventories", tags=["inventories"])
 
 
 # GET /inventories/serials —— 可用序列号列表
-@router.get("/serials", response_model=AvailableSerialsResponse)
+@router.get("/serials", response_model=AvailableSerialsResponse, dependencies=[Depends(require_permission("inventory", "view"))])
 def available_serials(
     product_id: int,
     warehouse_id: int,

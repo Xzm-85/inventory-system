@@ -6,6 +6,7 @@
 #   DELETE /customers/{id}   删除
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.deps import require_permission
 from sqlalchemy.orm import Session
 
 from app.crud.customer import (
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/customers", tags=["customers"])
 
 
 # POST /customers —— 新增，名称重复则 400
-@router.post("", response_model=Customer, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Customer, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("base_data", "create"))])
 def create(data: CustomerCreate, db: Session = Depends(get_db)):
     if get_customer_by_name(db, data.name) is not None:
         raise HTTPException(status_code=400, detail="客户名称已存在")
@@ -31,13 +32,13 @@ def create(data: CustomerCreate, db: Session = Depends(get_db)):
 
 
 # GET /customers —— 列表
-@router.get("", response_model=list[Customer])
+@router.get("", response_model=list[Customer], dependencies=[Depends(require_permission("base_data", "view"))])
 def list_customers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return get_customers(db, skip=skip, limit=limit)
 
 
 # GET /customers/{customer_id} —— 按 id 查询
-@router.get("/{customer_id}", response_model=Customer)
+@router.get("/{customer_id}", response_model=Customer, dependencies=[Depends(require_permission("base_data", "view"))])
 def read(customer_id: int, db: Session = Depends(get_db)):
     customer = get_customer(db, customer_id)
     if customer is None:
@@ -46,7 +47,7 @@ def read(customer_id: int, db: Session = Depends(get_db)):
 
 
 # PUT /customers/{customer_id} —— 更新，改名时查重
-@router.put("/{customer_id}", response_model=Customer)
+@router.put("/{customer_id}", response_model=Customer, dependencies=[Depends(require_permission("base_data", "edit"))])
 def update(customer_id: int, data: CustomerUpdate, db: Session = Depends(get_db)):
     if data.name is not None:
         existing = get_customer_by_name(db, data.name)
@@ -59,7 +60,7 @@ def update(customer_id: int, data: CustomerUpdate, db: Session = Depends(get_db)
 
 
 # DELETE /customers/{customer_id} —— 删除
-@router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{customer_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_permission("base_data", "delete"))])
 def delete(customer_id: int, db: Session = Depends(get_db)):
     if not delete_customer(db, customer_id):
         raise HTTPException(status_code=404, detail="客户不存在")

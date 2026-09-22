@@ -8,6 +8,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.deps import require_permission
 from app.crud.category import get_category
 from app.crud.product import (
     create_product,
@@ -24,7 +25,8 @@ router = APIRouter(prefix="/products", tags=["products"])
 
 
 # POST /products —— 新增商品
-@router.post("", response_model=Product, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Product, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_permission("product", "create"))])
 def create(data: ProductCreate, db: Session = Depends(get_db)):
     # 传了 category_id 就必须是真实存在的分类
     if data.category_id is not None and get_category(db, data.category_id) is None:
@@ -36,13 +38,15 @@ def create(data: ProductCreate, db: Session = Depends(get_db)):
 
 
 # GET /products —— 商品列表
-@router.get("", response_model=list[Product])
+@router.get("", response_model=list[Product],
+            dependencies=[Depends(require_permission("product", "view"))])
 def list_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return get_products(db, skip=skip, limit=limit)
 
 
 # GET /products/{product_id} —— 按 id 查询
-@router.get("/{product_id}", response_model=Product)
+@router.get("/{product_id}", response_model=Product,
+            dependencies=[Depends(require_permission("product", "view"))])
 def read(product_id: int, db: Session = Depends(get_db)):
     product = get_product(db, product_id)
     if product is None:
@@ -51,7 +55,8 @@ def read(product_id: int, db: Session = Depends(get_db)):
 
 
 # PUT /products/{product_id} —— 更新（只更新传了的字段）
-@router.put("/{product_id}", response_model=Product)
+@router.put("/{product_id}", response_model=Product,
+            dependencies=[Depends(require_permission("product", "edit"))])
 def update(product_id: int, data: ProductUpdate, db: Session = Depends(get_db)):
     product = update_product(db, product_id, data)
     if product is None:
@@ -60,7 +65,8 @@ def update(product_id: int, data: ProductUpdate, db: Session = Depends(get_db)):
 
 
 # DELETE /products/{product_id} —— 删除（会连带删除该商品的价格）
-@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT,
+               dependencies=[Depends(require_permission("product", "delete"))])
 def delete(product_id: int, db: Session = Depends(get_db)):
     if not delete_product(db, product_id):
         raise HTTPException(status_code=404, detail="商品不存在")

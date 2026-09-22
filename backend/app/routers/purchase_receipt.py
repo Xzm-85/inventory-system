@@ -2,6 +2,7 @@
 #   POST /purchase-receipts   创建入库单（自动累加库存 + 更新订单状态）
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from app.core.deps import require_permission
 from sqlalchemy.orm import Session
 
 from app.crud.inventory import get_serial_by_number
@@ -44,7 +45,7 @@ def _validate_serials(db: Session, item, product) -> None:
 
 
 # POST /purchase-receipts —— 创建入库单
-@router.post("", response_model=PurchaseReceipt, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PurchaseReceipt, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("purchase", "create"))])
 def create(data: PurchaseReceiptCreate, db: Session = Depends(get_db)):
     if not data.items:
         raise HTTPException(status_code=400, detail="入库明细不能为空")
